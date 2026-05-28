@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from os import PathLike
+from pathlib import Path
 from typing import Any
 
 import duckdb
@@ -27,7 +27,7 @@ class Calculator:
     """
     TODO: write docstring
     """
-    database: PathLike[str]
+    database: str | Path
     memory_limit: str = "8GB"
     workers: int = 1
     _con: None | DuckDBPyConnection = None
@@ -43,7 +43,11 @@ class Calculator:
             ChunkQueryTask(query=query, chunk=chunk_df)
             for chunk_df in self._iter_chunks()
         ]
-        for cqt in calculate_chunks(tasks, workers=self.workers):
+        for cqt in calculate_chunks(
+            tasks=tasks, 
+            database=self.database, 
+            workers=self.workers
+        ):
             self.con.from_df(cqt.result).insert_into(RESULT_TABLE)
             pbar.update(cqt.chunk.shape[0])
         return self
@@ -51,18 +55,41 @@ class Calculator:
     def safe_calc(self, group: str, **kwargs: dict[str, Any]) -> Calculator:
         """TODO: write docstring"""
         # prepare
+        con = duckdb.connect(self.database, read_only=True)
+        con.load_extension("spatial")
         query_template = get_sql_template(name=group)
         query = query_template.render(**kwargs)
         pbar = tqdm(total=self._input_count, desc=group)
         # calculate
         for chunk_df in self._iter_chunks():
             cqt = ChunkQueryTask(
-                con=self.con, 
+                con=con, 
                 query=query, 
                 chunk=chunk_df,
             ).run()
             self.con.from_df(cqt.result).insert_into(RESULT_TABLE)
             pbar.update(chunk_df.shape[0])
+        con.close()
+        return self
+    
+    def test_calc(self, group: str, **kwargs: dict[str, Any]) -> Calculator:
+        """TODO: write docstring"""
+        # prepare
+        con = duckdb.connect(self.database, read_only=True)
+        con.load_extension("spatial")
+        query_template = get_sql_template(name=group)
+        query = query_template.render(**kwargs)
+        # calculate
+        for chunk_df in self._iter_chunks():
+            cqt = ChunkQueryTask(
+                con=con, 
+                query=query, 
+                chunk=chunk_df,
+            ).run()
+            rel = self.con.from_df(cqt.result).execute()
+            print(rel)
+            raise Exception("STOP")
+        con.close()
         return self
 
     def set_input(

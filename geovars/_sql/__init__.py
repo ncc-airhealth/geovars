@@ -18,7 +18,7 @@ def get_sql_template(name: str) -> Template:
     """
     _path = (SQL_DIR / name).with_suffix(".sql")
     if not _path.is_file():
-        raise ValueError("not supported sql name: `{name}`")
+        raise ValueError(f"not supported sql name: `{name}`")
     return env.get_template(f"{name}.sql")
 
 __all__ = [

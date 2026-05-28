@@ -3,6 +3,7 @@ from __future__ import annotations
 import multiprocessing as mp
 import queue
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Iterable
 
 import duckdb
@@ -42,10 +43,12 @@ class ChunkQueryTask:
 
 
 def _worker(
+    database: str | Path,
     queue_start: mp.Queue[ChunkQueryTask], 
     queue_done: mp.Queue[ChunkQueryTask]
 ) -> None:
-    con = duckdb.connect()
+    con = duckdb.connect(database=database, read_only=True)
+    con.execute("SET threads = 1;")
     con.load_extension("spatial")
     # work
     while True:
@@ -66,7 +69,11 @@ def _worker(
     con.close()
     return
 
-def calculate_chunks(tasks: Iterable[ChunkQueryTask], workers: int):
+def calculate_chunks(
+        tasks: Iterable[ChunkQueryTask], 
+        database: str | Path, 
+        workers: int
+    ):
     """TODO: docstring 추가"""
     # run queue
     mp.set_start_method("spawn", force=True)
@@ -75,7 +82,11 @@ def calculate_chunks(tasks: Iterable[ChunkQueryTask], workers: int):
     # spawn workers
     worker_pool: list[Any] = []
     for _ in range(workers):
-        kwargs = {"queue_start": queue_start, "queue_done": queue_done}
+        kwargs: dict[str, Any] = {
+            "database": database,
+            "queue_start": queue_start, 
+            "queue_done": queue_done,
+        }
         p = mp.Process(target=_worker, kwargs=kwargs)
         p.start()
         worker_pool.append(p)
