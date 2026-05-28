@@ -21,6 +21,7 @@ def main():
         .set_input(tbl=input_df, pk="pid", x="longitude", y="latitude", crs="EPSG:4326")
         .cluster(algorithm="hilbert", size=500)
         .calc(group="coordinate", year=YEARS)
+        .calc(group="bus_distance", year=YEARS)
         # .safe_calc(group="road_distance", year=YEARS)
         # .safe_calc(group="road_llw")
         .df(as_wide=True)
