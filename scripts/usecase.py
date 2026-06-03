@@ -20,10 +20,27 @@ def main():
         calculator
         .set_input(tbl=input_df, pk="pid", x="longitude", y="latitude", crs="EPSG:4326")
         .cluster(algorithm="hilbert", size=500)
-        .calc(group="coordinate", year=YEARS)
-        .calc(group="bus_distance", year=YEARS)
-        # .safe_calc(group="road_distance", year=YEARS)
-        # .safe_calc(group="road_llw")
+        # .calc(group="coordinate", year=[2000, 2005, 2010, 2015, 2020])
+        # .calc(group="distance_to_airport", year=[2000, 2005, 2010, 2015, 2020])
+        # .calc(group="distance_to_road", year=[2005, 2010, 2015, 2020])
+        # .calc(group="distance_to_railway", year=[2005, 2010, 2015, 2020])
+        # .calc(group="distance_to_railstation", year=[2005, 2010, 2015, 2020])
+        # .calc(group="distance_to_bus_stop", year=[2000, 2005, 2010, 2015, 2020])
+        # .calc(group="distance_to_coast", year=[2000, 2005, 2010, 2015, 2020])
+        # .calc(group="distance_to_river", year=[2000, 2005, 2010, 2015, 2020])
+        # .calc(group="distance_to_mdl", year=[2000, 2005, 2010, 2015, 2020])
+        # .calc(group="distance_to_port", year=[2000, 2005, 2010, 2015, 2020])
+        # .calc(group="car_registration", year=[2000, 2005, 2010, 2015, 2020])
+        # .test_calc(group="ndvi_statistics", year=[2000, 2005, 2010, 2015, 2020], buffer=[1000, 5000])
+        # .test_calc(group="road_llw", year=[2005, 2010, 2015, 2020], buffer=[25, 50, 100, 300, 500, 1000, 5000])
+        # .calc(group="sgis_statistics", year=[2000, 2005, 2010, 2015, 2020], buffer=[100, 300, 1000, 5000])
+        # .safe_calc(group="landcover", year=[2000, 2005, 2010, 2015, 2020], buffer=[100, 300, 1000, 5000])
+        # .calc(group="emission", year=[2000, 2005, 2010, 2015, 2020], buffer=[3000, 10000, 20000])
+        .test_calc(group="elevation", year=[2000, 2005, 2010, 2015, 2020], rel_height=[20 ,50], buffer=[1000, 5000])
+        
+        
+        
+        
         .df(as_wide=True)
     )
 

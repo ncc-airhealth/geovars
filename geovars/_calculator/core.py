@@ -28,7 +28,7 @@ class Calculator:
     TODO: write docstring
     """
     database: str | Path
-    memory_limit: str = "8GB"
+    memory_limit: str = "5GB"
     workers: int = 1
     _con: None | DuckDBPyConnection = None
 
@@ -57,6 +57,7 @@ class Calculator:
         # prepare
         con = duckdb.connect(self.database, read_only=True)
         con.load_extension("spatial")
+        con.load_extension("h3")
         query_template = get_sql_template(name=group)
         query = query_template.render(**kwargs)
         pbar = tqdm(total=self._input_count, desc=group)
@@ -77,6 +78,7 @@ class Calculator:
         # prepare
         con = duckdb.connect(self.database, read_only=True)
         con.load_extension("spatial")
+        con.load_extension("h3")
         query_template = get_sql_template(name=group)
         query = query_template.render(**kwargs)
         # calculate
@@ -173,8 +175,10 @@ class Calculator:
     def _init_query(self) -> str:
         """TODO: write docstring"""
         return f"""
-        INSTALL spatial;
-        LOAD spatial;
+        SET enable_progress_bar = false;
+        SET memory_limit = '{self.memory_limit}';
+        INSTALL spatial; LOAD spatial;
+        INSTALL h3 FROM community; LOAD h3;
         CREATE TEMP TABLE {RESULT_TABLE} (
             id         VARCHAR,
             gv_year    UINT16,

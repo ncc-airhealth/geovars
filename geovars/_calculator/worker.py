@@ -48,8 +48,12 @@ def _worker(
     queue_done: mp.Queue[ChunkQueryTask]
 ) -> None:
     con = duckdb.connect(database=database, read_only=True)
-    con.execute("SET threads = 1;")
-    con.load_extension("spatial")
+    con.execute("""
+    SET enable_progress_bar = false;
+    SET threads = 1;
+    LOAD spatial;
+    LOAD h3;
+    """)
     # work
     while True:
         try:

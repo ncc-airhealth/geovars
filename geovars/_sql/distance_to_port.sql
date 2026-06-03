@@ -1,5 +1,5 @@
 /*
-주어진 위치로부터 가자 가까운 버스정류장 까지의 거리(m)를 계산하는 스크립트
+주어진 위치로부터 항만 까지의 거리(m)
 */
 
 --------------------------------------------------------------------------------
@@ -17,16 +17,13 @@ CREATE OR REPLACE TEMP TABLE year AS (
 -- main query
 --------------------------------------------------------------------------------
 
-WITH
-dist AS (
-    SELECT 
-        c.id AS id,
-        'D_bus' AS gv_name,
-        ST_Distance(b.geom, c.geom).MIN() AS gv_value,
-    FROM 
-        chunk c
-    LEFT JOIN bus_stop b ON ST_DWithin(c.geom, b.geom, 10000)
-    GROUP BY id
-)
-SELECT d.id, y.gv_year, d.gv_name, d.gv_value
-FROM dist d, year y
+SELECT 
+    c.id AS id,
+    y.gv_year,
+    'D_Port' AS gv_name,
+    ST_Distance(t.geom, c.geom).MIN() AS gv_value,
+FROM chunk c
+CROSS JOIN year y
+LEFT JOIN port t ON y.gv_year = t.year
+GROUP BY c.id, y.gv_year
+;

@@ -1,5 +1,5 @@
 /*
-주어진 위치로부터 가장 가까운 해안선까지의 거리(m)를 계산하는 스크립트
+주어진 위치로부터 가자 가까운 철로 까지의 거리(m)
 */
 
 --------------------------------------------------------------------------------
@@ -17,18 +17,13 @@ CREATE OR REPLACE TEMP TABLE year AS (
 -- main query
 --------------------------------------------------------------------------------
 
-WITH simple_coastline AS (
-    SELECT year, geom, geom.ST_Simplify(10) AS geom_simple
-    FROM coastline
-)
 SELECT 
     c.id AS id,
     y.gv_year,
-    'D_Coast' AS gv_name,
-    ST_Distance(c.geom, l.geom_simple).MIN() AS gv_value,
-FROM 
-    chunk c
-CROSS JOIN simple_coastline l
-LEFT JOIN year y ON l.year = y.gv_year
-GROUP BY c.id, y.gv_year
+    'D_Rail' AS gv_name,
+    ST_Distance(t.geom, c.geom).MIN() AS gv_value,
+FROM chunk c
+CROSS JOIN year y
+LEFT JOIN railway t ON t.year = y.gv_year
+GROUP BY id, gv_year
 ;

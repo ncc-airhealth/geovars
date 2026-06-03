@@ -1,5 +1,5 @@
 /*
-주어진 위치의 좌표값 지리변수를 계산하는 스크립트
+주어진 위치의 x, y 좌표
 */
 
 --------------------------------------------------------------------------------
@@ -13,7 +13,6 @@ CREATE OR REPLACE TEMP TABLE constants AS (
         'EPSG:4326' AS wgs_crs,
         'EPSG:5179' AS tm_crs,
 );
-
 
 -- years
 CREATE OR REPLACE TEMP TABLE year AS (
@@ -48,8 +47,8 @@ result_wide AS (
     FROM
         input_geom g, year y
 ),
--- geovariable long format
-result_long AS (
+-- geovariable
+result AS (
     UNPIVOT result_wide
     ON WGS_X, WGS_Y, TM_X, TM_Y
     INTO 
@@ -57,11 +56,6 @@ result_long AS (
         VALUE gv_value
 )
 -- result
-SELECT 
-    id, 
-    gv_year, 
-    gv_name, 
-    gv_value,
-FROM 
-    result_long
+SELECT id, gv_year, gv_name, gv_value
+FROM result
 ;
