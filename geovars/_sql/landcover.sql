@@ -18,16 +18,24 @@ CREATE OR REPLACE TEMP TABLE buffer AS (
     FROM UNNEST([{{ buffer | join(', ') }}]) AS t(radius)
 );
 
+-- code
+CREATE OR REPLACE TEMP TABLE code AS (
+    SELECT code::UINT16 AS code
+    FROM UNNEST([110, 120, 130, 140, 150, 160, 200, 310, 320, 330, 400, 500, 600, 710]) AS t(code)
+);
+
 
 --------------------------------------------------------------------------------
 -- main query
 --------------------------------------------------------------------------------
 
+CREATE INDEX chunk_rtree ON chunk USING RTREE(geom);
+
 CREATE OR REPLACE TEMP TABLE aoi_landcover AS (
     WITH aoi_h3 AS (
         SELECT 
             c.geom
-                .ST_Buffer(5000)
+                .ST_Buffer(5000, quad_segs:=16)
                 .ST_Transform('EPSG:5179', 'EPSG:4326', always_xy:=true)
                 .ST_AsText()
                 .h3_polygon_wkt_to_cells_experimental(7, 'overlap')
@@ -45,52 +53,17 @@ CREATE OR REPLACE TEMP TABLE aoi_landcover AS (
 );
 CREATE INDEX rtree_aoi_landcover
 ON aoi_landcover
-USING RTREE(geom);
+USING RTREE(geom) WITH (max_node_capacity = 8);
 
-
-WITH overlap AS (
-    SELECT 
-        c.id, 
-        y.gv_year, 
-        b.radius, 
-        t.code, 
-        ST_Intersection(c.geom, t.geom).ST_Area().SUM() AS area
-    FROM chunk c
-    CROSS JOIN year y
-    CROSS JOIN buffer b
-    LEFT JOIN aoi_landcover t ON y.gv_year = t.year AND ST_DWithin(c.geom, t.geom, b.radius)
-    GROUP BY c.id, y.gv_year, b.radius, t.code
-), wide AS (
-    SELECT
-        id, 
-        gv_year, 
-        radius, 
-        (code = 110)::INT * area AS LS_110,
-        (code = 120)::INT * area AS LS_120,
-        (code = 130)::INT * area AS LS_130,
-        (code = 140)::INT * area AS LS_140,
-        (code = 150)::INT * area AS LS_150,
-        (code = 160)::INT * area AS LS_160,
-        (code = 200)::INT * area AS LS_200,
-        (code = 310)::INT * area AS LS_310,
-        (code = 320)::INT * area AS LS_320,
-        (code = 330)::INT * area AS LS_330,
-        (code = 400)::INT * area AS LS_400,
-        (code = 500)::INT * area AS LS_500,
-        (code = 600)::INT * area AS LS_600,
-        (code = 710)::INT * area AS LS_710,
-    FROM overlap
-), long AS (
-    UNPIVOT wide
-    ON * EXCLUDE (id, gv_year, radius)
-    INTO NAME gv_name VALUE gv_value
-), result AS (
-    SELECT
-        id,
-        gv_year,
-        gv_name || '_' || LPAD(radius::VARCHAR, 4, '0') AS gv_name,
-        gv_value,
-    FROM long
-)
-SELECT * FROM result
-;
+SELECT 
+    c.id, 
+    y.gv_year, 
+    'LS_' || t.code::VARCHAR || '_' || LPAD(b.radius::VARCHAR, 4, '0') AS gv_name,
+    ST_Intersection(c.geom, t.geom).ST_Area().SUM() AS gv_value
+FROM chunk c
+CROSS JOIN year y
+CROSS JOIN buffer b
+CROSS JOIN code d
+LEFT JOIN aoi_landcover t 
+    ON y.gv_year = t.year AND d.code = t.code AND ST_DWithin(c.geom, t.geom, b.radius)
+GROUP BY c.id, y.gv_year, b.radius, t.code
