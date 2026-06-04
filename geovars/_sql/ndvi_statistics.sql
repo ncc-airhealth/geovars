@@ -1,30 +1,23 @@
 /*
-주어진 위치로부터 가자 가까운 공항 까지의 거리(m)
+주어진 위치의 NDVI 연간 통계
 */
 
---------------------------------------------------------------------------------
--- params
---------------------------------------------------------------------------------
-
 -- years
-CREATE OR REPLACE TEMP TABLE year AS (
+CREATE OR REPLACE TEMP TABLE _year AS (
     SELECT year::UINT16 AS gv_year
     FROM UNNEST([{{ year | join(', ') }}]) AS t(year)
 );
 
 -- buffer
-CREATE OR REPLACE TEMP TABLE buffer AS (
+CREATE OR REPLACE TEMP TABLE _buffer AS (
     SELECT radius::UINT16 AS radius
     FROM UNNEST([{{ buffer | join(', ') }}]) AS t(radius)
 );
 
 
---------------------------------------------------------------------------------
--- main query
---------------------------------------------------------------------------------
-
-CREATE OR REPLACE TEMP TABLE aoi_ndvi_stat AS (
-    WITH aoi_h3 AS (
+-- ndvi_stat in aoi
+CREATE OR REPLACE TEMP TABLE _aoi_ndvi_stat AS (
+    WITH _aoi_h3 AS (
         SELECT 
             c.geom
                 .ST_Buffer(5000)
@@ -36,7 +29,8 @@ CREATE OR REPLACE TEMP TABLE aoi_ndvi_stat AS (
                 .LIST_DISTINCT()
                 .UNNEST()
                 AS h3
-        FROM chunk c, buffer b
+        FROM _chunk c
+        CROSS JOIN _buffer b
     )
     SELECT 
         t.year, 
@@ -46,44 +40,48 @@ CREATE OR REPLACE TEMP TABLE aoi_ndvi_stat AS (
         t.ndvi_median, 
         t.ndvi_08_median, 
         t.geom,
-    FROM aoi_h3 h
-    CROSS JOIN year y
+    FROM _aoi_h3 h
+    CROSS JOIN _year y
     INNER JOIN ndvi_stat t ON h.h3 = t.h3 AND y.gv_year = t.year
     WHERE t.geom.ST_X() > 0
 );
-CREATE INDEX rtree_aoi_ndvi_stat
-ON aoi_ndvi_stat
-USING RTREE(geom);
+CREATE INDEX _rtree_aoi_ndvi_stat
+ON _aoi_ndvi_stat
+USING RTREE(geom) WITH (max_node_capacity = 16);
 
-WITH point_stat_wide AS (
+-- main query
+WITH _point_stat_wide AS (
     SELECT
         c.id,
         y.gv_year,
         t.ndvi_mean.ARGMIN(ST_Distance(c.geom, t.geom)) AS NDVI_Y1_Mean, 
         t.ndvi_min.ARGMIN(ST_Distance(c.geom, t.geom)) AS NDVI_Y1_Min, 
         t.ndvi_max.ARGMIN(ST_Distance(c.geom, t.geom)) AS NDVI_Y1_Max, 
-        t.ndvi_08_median.ARGMIN(ST_Distance(c.geom, t.geom)) AS NDVI_M08_Median, 
-    FROM chunk c
-    CROSS JOIN year y
-    LEFT JOIN aoi_ndvi_stat t ON y.gv_year = t.year AND ST_DWithin(c.geom, t.geom, 1000)
+        IF (
+            y.gv_year = 2000,
+            NULL,
+            t.ndvi_08_median.ARGMIN(ST_Distance(c.geom, t.geom))
+        ) AS NDVI_M08_Median, -- 전년도 MODIS 데이터 부재
+    FROM _chunk c
+    CROSS JOIN _year y
+    LEFT JOIN _aoi_ndvi_stat t ON y.gv_year = t.year AND ST_DWithin(c.geom, t.geom, 500)
     GROUP BY c.id, y.gv_year
-), point_stat AS (
-    UNPIVOT point_stat_wide
+), _point_stat AS (
+    UNPIVOT _point_stat_wide
     ON * EXCLUDE (id, gv_year)
     INTO NAME gv_name VALUE gv_value
-), area_stat AS (
+), _area_stat AS (
     SELECT
         c.id,
         y.gv_year,
         'NDVI_MM_' || LPAD(b.radius::VARCHAR, 4, '0') AS gv_name,
         ndvi_median.MEAN() AS value, 
-    FROM chunk c
-    CROSS JOIN year y
-    CROSS JOIN buffer b
-    LEFT JOIN aoi_ndvi_stat t ON y.gv_year = t.year AND ST_DWithin(c.geom, t.geom, b.radius)
+    FROM _chunk c
+    CROSS JOIN _year y
+    CROSS JOIN _buffer b
+    LEFT JOIN _aoi_ndvi_stat t ON y.gv_year = t.year AND ST_DWithin(c.geom, t.geom, b.radius)
     GROUP BY c.id, y.gv_year, b.radius
 )
-
-SELECT * FROM point_stat
+SELECT * FROM _point_stat
 UNION ALL
-SELECT * FROM area_stat
+SELECT * FROM _area_stat
