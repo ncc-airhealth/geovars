@@ -36,6 +36,7 @@ class ChunkQueryTask:
             SELECT id, geom.ST_GeomFromWKB() AS geom
             FROM chunk_df
         );
+        CREATE INDEX _{CHUNK_TABLE}_rtree ON {CHUNK_TABLE} USING RTREE(geom);
         """)
         self.result = self.con.sql(self.query).df()
         self.con.unregister(view_name="chunk_df")

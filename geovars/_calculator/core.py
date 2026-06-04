@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -11,8 +11,8 @@ from tqdm import tqdm
 
 from .clustering import cluster_xy
 from geovars._common import (
-    CHUNK_TABLE,
     CLUSTER_TABLE,
+    Clustering,
     CLUSTER_COL,
     INPUT_TABLE,
     RESULT_TABLE,
@@ -30,7 +30,10 @@ class Calculator:
     database: str | Path
     memory_limit: str = "5GB"
     workers: int = 1
+    clustering: Clustering = Clustering.H3
+    cluster_kwargs: dict[str, Any] = field(default_factory=dict)
     _con: None | DuckDBPyConnection = None
+    _chunk_dfs: list[pd.DataFrame] | None = None
 
     def calc(self, group: str, **kwargs: dict[str, Any]) -> Calculator:
         """TODO: write docstring"""
@@ -41,7 +44,7 @@ class Calculator:
         # add task
         tasks = [
             ChunkQueryTask(query=query, chunk=chunk_df)
-            for chunk_df in self._iter_chunks()
+            for chunk_df in self.chunk_dfs
         ]
         for cqt in calculate_chunks(
             tasks=tasks, 
@@ -62,7 +65,7 @@ class Calculator:
         query = query_template.render(**kwargs)
         pbar = tqdm(total=self._input_count, desc=group)
         # calculate
-        for chunk_df in self._iter_chunks():
+        for chunk_df in self.chunk_dfs:
             cqt = ChunkQueryTask(
                 con=con, 
                 query=query, 
@@ -82,7 +85,7 @@ class Calculator:
         query_template = get_sql_template(name=group)
         query = query_template.render(**kwargs)
         # calculate
-        for chunk_df in self._iter_chunks():
+        for chunk_df in self.chunk_dfs:
             cqt = ChunkQueryTask(
                 con=con, 
                 query=query, 
@@ -90,6 +93,7 @@ class Calculator:
             ).run()
             rel = self.con.from_df(cqt.result).execute()
             print(rel)
+            print(rel.df().iloc[0, 1])
             raise Exception("STOP")
         con.close()
         return self
@@ -122,16 +126,17 @@ class Calculator:
         );
         """)
         self.con.unregister("temp")
+        self._cluster()
         return self
     
-    def cluster(self, algorithm: str, **kwargs: dict[str, Any]) -> Calculator:
+    def _cluster(self) -> Calculator:
         """TODO: write docstring"""
-        cluster_df = cluster_xy(
+        cluster_rel = cluster_xy(
             rel=self.con.table(INPUT_TABLE),
-            algorithm=algorithm,
-            **kwargs,
+            algorithm=self.clustering,
+            **self.cluster_kwargs,
         )
-        self.con.register(view_name=CLUSTER_TABLE, python_object=cluster_df)
+        self.con.register(view_name=CLUSTER_TABLE, python_object=cluster_rel)
         return self
     
     def df(self, as_wide: bool=False):
@@ -144,22 +149,14 @@ class Calculator:
         USING FIRST(gv_value)
         """).df()
     
-    def _iter_chunks(self):
-        """TODO: write docstring"""
-        id_sql = f"""
-        SELECT DISTINCT {CLUSTER_COL} 
-        FROM {CLUSTER_TABLE} 
-        ORDER BY {CLUSTER_COL}
-        """
-        chunk_sql = f"""
-        SELECT id, geom
-        FROM {CLUSTER_TABLE}
-        WHERE {CLUSTER_COL} = {{cid}}
-        """
-        # iter clusters
-        for r in self.con.sql(id_sql).fetchall():
-            query = chunk_sql.format(cid=r[0])
-            yield self.con.sql(query).df()
+    @property
+    def chunk_dfs(self) -> list[pd.DataFrame]:
+        if self._chunk_dfs is None:
+            self._chunk_dfs = []
+            df = self.con.table(CLUSTER_TABLE).df()
+            for _, cdf in df.groupby(CLUSTER_COL):
+                self._chunk_dfs.append(cdf)
+        return self._chunk_dfs
     
     @property
     def con(self) -> DuckDBPyConnection:
