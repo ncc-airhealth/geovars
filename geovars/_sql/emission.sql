@@ -40,7 +40,7 @@ WITH _wide_result AS (
     SELECT
         id,
         gv_year,
-        gv_name || '_' || (radius / 1000)::INT::VARCHAR || 'km' AS gv_name,
+        'EM_' || gv_name || '_' || (radius / 1000)::INT::VARCHAR || 'km' AS gv_name,
         gv_value,
     FROM _long_result
 )
