@@ -100,97 +100,97 @@ WITH _output_area AS (
             WHEN y.gv_year IN [2010, 2015] THEN (cp_bnu_001).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2020] THEN (cp_bnu_001).MULTIPLY(o.weight).SUM()
             ELSE 0
-        END AS B_bnu_01,
+        END AS B_bnu_1,
         CASE
             WHEN y.gv_year IN [2000, 2005] THEN (cp_bnu_003 + cp_bnu_004).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2010, 2015] THEN (cp_bnu_002 + cp_bnu_003).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2020] THEN (cp_bnu_002 + cp_bnu_003).MULTIPLY(o.weight).SUM()
             ELSE 0
-        END AS B_bnu_02,
+        END AS B_bnu_2,
         CASE
             WHEN y.gv_year IN [2000, 2005] THEN (cp_bnu_005).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2010, 2015] THEN (cp_bnu_004 + cp_bnu_005).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2020] THEN (cp_bnu_004 + cp_bnu_005).MULTIPLY(o.weight).SUM()
             ELSE 0
-        END AS B_bnu_03,
+        END AS B_bnu_3,
         CASE
             WHEN y.gv_year IN [2000, 2005] THEN (cp_bnu_006).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2010, 2015] THEN (cp_bnu_006).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2020] THEN (cp_bnu_006).MULTIPLY(o.weight).SUM()
             ELSE 0
-        END AS B_bnu_04,
+        END AS B_bnu_4,
         CASE
             WHEN y.gv_year IN [2000, 2005] THEN (cp_bnu_007).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2010, 2015] THEN (cp_bnu_007).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2020] THEN (cp_bnu_007).MULTIPLY(o.weight).SUM()
             ELSE 0
-        END AS B_bnu_05,
+        END AS B_bnu_5,
         CASE
             WHEN y.gv_year IN [2000, 2005] THEN (cp_bnu_009).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2010, 2015] THEN (cp_bnu_008).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2020] THEN (cp_bnu_008).MULTIPLY(o.weight).SUM()
             ELSE 0
-        END AS B_bnu_06,
+        END AS B_bnu_6,
         CASE
             WHEN y.gv_year IN [2000, 2005] THEN (cp_bnu_008).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2010, 2015] THEN (cp_bnu_009).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2020] THEN (cp_bnu_009).MULTIPLY(o.weight).SUM()
             ELSE 0
-        END AS B_bnu_07,
+        END AS B_bnu_7,
         CASE
             WHEN y.gv_year IN [2000, 2005] THEN (cp_bnu_010 + cp_bnu_011 + cp_bnu_013 + cp_bnu_014 + cp_bnu_015 + cp_bnu_016 + cp_bnu_017 + cp_bnu_018).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2010, 2015] THEN (cp_bnu_010 + cp_bnu_011 + cp_bnu_013 + cp_bnu_014 + cp_bnu_015 + cp_bnu_016 + cp_bnu_017 + cp_bnu_018 + cp_bnu_019).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2020] THEN (cp_bnu_010 + cp_bnu_011 + cp_bnu_013 + cp_bnu_014 + cp_bnu_015 + cp_bnu_016 + cp_bnu_017 + cp_bnu_018 + cp_bnu_019).MULTIPLY(o.weight).SUM()
             ELSE 0
-        END AS B_bnu_08,
+        END AS B_bnu_8,
         CASE
             WHEN y.gv_year IN [2000, 2005] THEN (cp_bem_001 + cp_bem_002).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2010, 2015] THEN (cp_bem_001).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2020] THEN (cp_bem_001).MULTIPLY(o.weight).SUM()
             ELSE 0
-        END AS B_bem_01,
+        END AS B_bem_1,
         CASE
             WHEN y.gv_year IN [2000, 2005] THEN (cp_bem_003 + cp_bem_004).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2010, 2015] THEN (cp_bem_002 + cp_bem_003).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2020] THEN (cp_bem_002 + cp_bem_003).MULTIPLY(o.weight).SUM()
             ELSE 0
-        END AS B_bem_02,
+        END AS B_bem_2,
         CASE
             WHEN y.gv_year IN [2000, 2005] THEN (cp_bem_005).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2010, 2015] THEN (cp_bem_004 + cp_bem_005).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2020] THEN (cp_bem_004 + cp_bem_005).MULTIPLY(o.weight).SUM()
             ELSE 0
-        END AS B_bem_03,
+        END AS B_bem_3,
         CASE
             WHEN y.gv_year IN [2000, 2005] THEN (cp_bem_006).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2010, 2015] THEN (cp_bem_006).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2020] THEN (cp_bem_006).MULTIPLY(o.weight).SUM()
             ELSE 0
-        END AS B_bem_04,
+        END AS B_bem_4,
         CASE
             WHEN y.gv_year IN [2000, 2005] THEN (cp_bem_007).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2010, 2015] THEN (cp_bem_007).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2020] THEN (cp_bem_007).MULTIPLY(o.weight).SUM()
             ELSE 0
-        END AS B_bem_05,
+        END AS B_bem_5,
         CASE
             WHEN y.gv_year IN [2000, 2005] THEN (cp_bem_009).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2010, 2015] THEN (cp_bem_008).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2020] THEN (cp_bem_008).MULTIPLY(o.weight).SUM()
             ELSE 0
-        END AS B_bem_06,
+        END AS B_bem_6,
         CASE
             WHEN y.gv_year IN [2000, 2005] THEN (cp_bem_008).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2010, 2015] THEN (cp_bem_009).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2020] THEN (cp_bem_009).MULTIPLY(o.weight).SUM()
             ELSE 0
-        END AS B_bem_07,
+        END AS B_bem_7,
         CASE
             WHEN y.gv_year IN [2000, 2005] THEN (cp_bem_010 + cp_bem_011 + cp_bem_013 + cp_bem_014 + cp_bem_015 + cp_bem_016 + cp_bem_017 + cp_bem_018).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2010, 2015] THEN (cp_bem_010 + cp_bem_011 + cp_bem_013 + cp_bem_014 + cp_bem_015 + cp_bem_016 + cp_bem_017 + cp_bem_018 + cp_bem_019).MULTIPLY(o.weight).SUM()
             WHEN y.gv_year IN [2020] THEN (cp_bem_010 + cp_bem_011 + cp_bem_013 + cp_bem_014 + cp_bem_015 + cp_bem_016 + cp_bem_017 + cp_bem_018 + cp_bem_019).MULTIPLY(o.weight).SUM()
             ELSE 0
-        END AS B_bem_08,
+        END AS B_bem_8,
     FROM _overlap_weight o
     CROSS JOIN _year y
     LEFT JOIN output_area_stat s ON y.gv_year = s.year AND o.tot_reg_cd = s.tot_reg_cd
