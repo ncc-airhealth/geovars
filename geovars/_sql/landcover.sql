@@ -79,7 +79,7 @@ WITH result_a AS (
     SELECT 
         id, 
         gv_year,
-        'LS_' || code::VARCHAR || '_' || LPAD(radius::VARCHAR, 4, '0') || '_a' AS gv_name, 
+        'LS' || code::VARCHAR || '_' || LPAD(radius::VARCHAR, 4, '0') || '_a' AS gv_name, 
         area AS gv_value
     FROM _overlap_area
 ), result_p AS (
