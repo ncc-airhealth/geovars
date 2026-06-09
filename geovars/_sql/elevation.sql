@@ -84,10 +84,7 @@ WITH _altitude_k AS (
     SELECT 
         c.id,
         'Altitude_k' AS gv_name,
-        IFNULL(
-            value.ARGMIN(ST_Distance(c.geom, e.geom)),
-            0
-        ) AS gv_value,
+        value.ARGMIN(ST_Distance(c.geom, e.geom)).GREATEST(0) AS gv_value,
     FROM _chunk c
     LEFT JOIN _aoi_dem e ON ST_DWithin(c.geom, e.geom, 30)
     GROUP BY c.id
@@ -95,10 +92,7 @@ WITH _altitude_k AS (
     SELECT 
         c.id,
         'Altitude_a' AS gv_name,
-        IFNULL(
-            value.ARGMIN(ST_Distance(c.geom, e.geom)),
-            0
-        ) AS gv_value,
+        value.ARGMIN(ST_Distance(c.geom, e.geom)).GREATEST(0) AS gv_value,
     FROM _chunk c
     LEFT JOIN _aoi_dsm e ON ST_DWithin(c.geom, e.geom, 30)
     GROUP BY c.id
@@ -107,12 +101,14 @@ WITH _altitude_k AS (
         c.id, 
         b.radius, 
         h.height,
-        ((e.value > k.gv_value + h.height)::INT).MEAN() AS above, 
-        ((e.value < k.gv_value - h.height)::INT).MEAN() AS below,
+        ((e.value > a.gv_value + h.height)::INT).MEAN() AS above, 
+        ((e.value < a.gv_value - h.height)::INT).MEAN() AS below,
     FROM _chunk c
     CROSS JOIN _buffer b
-    LEFT JOIN _aoi_dsm e ON ST_DWithin(c.geom, e.geom, b.radius)
-    LEFT JOIN _altitude_k k ON c.id = k.id
+    LEFT JOIN _aoi_dem e 
+        ON NOT ST_DWithin(c.geom, e.geom, b.radius)
+        AND ST_DWithin(c.geom, e.geom, b.radius + 30)
+    LEFT JOIN _altitude_k a ON c.id = a.id
     CROSS JOIN _rel_height h
     GROUP BY c.id, b.radius, h.height
 ), _rel_alt_k AS (
@@ -126,12 +122,14 @@ WITH _altitude_k AS (
         c.id, 
         b.radius, 
         h.height,
-        ((e.value > k.gv_value + h.height)::INT).MEAN() AS above, 
-        ((e.value < k.gv_value - h.height)::INT).MEAN() AS below,
+        ((e.value > a.gv_value + h.height)::INT).MEAN() AS above, 
+        ((e.value < a.gv_value - h.height)::INT).MEAN() AS below,
     FROM _chunk c
     CROSS JOIN _buffer b
-    LEFT JOIN _aoi_dsm e ON ST_DWithin(c.geom, e.geom, b.radius)
-    LEFT JOIN _altitude_k k ON c.id = k.id
+    LEFT JOIN _aoi_dsm e
+        ON NOT ST_DWithin(c.geom, e.geom, b.radius)
+        AND ST_DWithin(c.geom, e.geom, b.radius + 30)
+    LEFT JOIN _altitude_a a ON c.id = a.id
     CROSS JOIN _rel_height h
     GROUP BY c.id, b.radius, h.height
 ), _rel_alt_a AS (
