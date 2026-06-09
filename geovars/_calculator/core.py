@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import duckdb
 import pandas as pd
@@ -14,11 +15,13 @@ from geovars._common import (
     CLUSTER_TABLE,
     Clustering,
     CLUSTER_COL,
+    ConnectionConfig,
     INPUT_TABLE,
     RESULT_TABLE,
     REFERENCE_CRS,
 )
 from geovars._sql import get_sql_template
+from .database import connect_database
 from .worker import calculate_chunks, ChunkQueryTask
 
 
@@ -29,6 +32,7 @@ class Calculator:
     """
     database: str | Path
     memory_limit: str = "5GB"
+    cache_dir: str | Path = ".cache/"
     workers: int = 1
     clustering: Clustering = Clustering.H3
     cluster_kwargs: dict[str, Any] = field(default_factory=dict)
@@ -48,8 +52,8 @@ class Calculator:
         ]
         for cqt in calculate_chunks(
             tasks=tasks, 
-            database=self.database, 
-            workers=self.workers
+            workers=self.workers,
+            connection_config=self._connection_config
         ):
             self.con.from_df(cqt.result).insert_into(RESULT_TABLE)
             pbar.update(cqt.chunk.shape[0])
@@ -58,12 +62,10 @@ class Calculator:
     def safe_calc(self, group: str, **kwargs: dict[str, Any]) -> Calculator:
         """TODO: write docstring"""
         # prepare
-        con = duckdb.connect(self.database, read_only=True)
-        con.load_extension("spatial")
-        con.load_extension("h3")
         query_template = get_sql_template(name=group)
         query = query_template.render(**kwargs)
         pbar = tqdm(total=self._input_count, desc=group)
+        con = connect_database(self._connection_config)
         # calculate
         for chunk_df in self.chunk_dfs:
             cqt = ChunkQueryTask(
@@ -79,11 +81,9 @@ class Calculator:
     def test_calc(self, group: str, **kwargs: dict[str, Any]) -> Calculator:
         """TODO: write docstring"""
         # prepare
-        con = duckdb.connect(self.database, read_only=True)
-        con.load_extension("spatial")
-        con.load_extension("h3")
         query_template = get_sql_template(name=group)
         query = query_template.render(**kwargs)
+        con = connect_database(self._connection_config)
         # calculate
         for chunk_df in self.chunk_dfs:
             cqt = ChunkQueryTask(
@@ -164,26 +164,23 @@ class Calculator:
         TODO: implement this method
         """
         if self._con is None:
-            self._con = duckdb.connect()
-            self._con.execute(self._init_query)
+            config = ConnectionConfig(
+                database=":memory:",
+                cache_dir=self.cache_dir, 
+                memory_limit=self.memory_limit,
+                read_only=False,
+            )
+            self._con = connect_database(config)
         return self._con
     
     @property
-    def _init_query(self) -> str:
-        """TODO: write docstring"""
-        return f"""
-        SET enable_progress_bar = false;
-        SET memory_limit = '{self.memory_limit}';
-        INSTALL spatial; LOAD spatial;
-        INSTALL h3 FROM community; LOAD h3;
-        CREATE TEMP TABLE {RESULT_TABLE} (
-            id         VARCHAR,
-            gv_year    UINT16,
-            gv_name    VARCHAR,
-            gv_value   DOUBLE
-        );
-        """
-    
+    def _connection_config(self) -> ConnectionConfig:
+        return ConnectionConfig(
+            database=self.database,
+            cache_dir=self.cache_dir, 
+            memory_limit=self.memory_limit,
+        )
+
     @property
     def _input_count(self) -> int:
         """TODO: write docstring"""

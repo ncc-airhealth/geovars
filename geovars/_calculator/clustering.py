@@ -33,7 +33,7 @@ def cluster_hilbert(rel: DuckDBPyRelation, max_size: int = 500) -> DuckDBPyRelat
 def cluster_h3(
     rel: DuckDBPyRelation, 
     resolution: int = 7, 
-    max_size: int = 500
+    max_size: int = 500,
 ) -> DuckDBPyRelation:
     query = f"""
     WITH _input_wgs84 AS (

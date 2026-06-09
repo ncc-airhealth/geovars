@@ -9,7 +9,8 @@ from typing import Any, Iterable
 import duckdb
 import pandas as pd
 
-from .._common import CHUNK_TABLE
+from .._common import CHUNK_TABLE, ConnectionConfig
+from .database import connect_database
 
 
 SENTINEL = "__SENTINEL__"
@@ -44,17 +45,11 @@ class ChunkQueryTask:
 
 
 def _worker(
-    database: str | Path,
+    connection_config: ConnectionConfig,
     queue_start: mp.Queue[ChunkQueryTask], 
     queue_done: mp.Queue[ChunkQueryTask]
 ) -> None:
-    con = duckdb.connect(database=database, read_only=True)
-    con.execute("""
-    SET enable_progress_bar = false;
-    SET threads = 1;
-    LOAD spatial;
-    LOAD h3;
-    """)
+    con = connect_database(connection_config)
     # work
     while True:
         try:
@@ -75,9 +70,9 @@ def _worker(
     return
 
 def calculate_chunks(
-        tasks: Iterable[ChunkQueryTask], 
-        database: str | Path, 
-        workers: int
+        tasks: Iterable[ChunkQueryTask],
+        workers: int,
+        connection_config: ConnectionConfig
     ):
     """TODO: docstring 추가"""
     # run queue
@@ -88,7 +83,7 @@ def calculate_chunks(
     worker_pool: list[Any] = []
     for _ in range(workers):
         kwargs: dict[str, Any] = {
-            "database": database,
+            "connection_config": connection_config,
             "queue_start": queue_start, 
             "queue_done": queue_done,
         }
