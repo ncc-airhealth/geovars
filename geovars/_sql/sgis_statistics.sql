@@ -32,7 +32,7 @@ CREATE OR REPLACE TEMP TABLE _oa_intersecting_weight AS (
             AS weight,
     FROM _chunk c
     CROSS JOIN _buffer b
-    LEFT JOIN _output_area_geom o ON ST_Intersects(c.geom, o.geom)
+    LEFT JOIN _output_area_geom o ON ST_DWithin(c.geom, o.geom, b.radius)
 );
 
 -- statistics
