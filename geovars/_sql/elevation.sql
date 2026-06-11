@@ -10,33 +10,23 @@ CREATE OR REPLACE TEMP TABLE _year AS (
 
 -- buffer
 CREATE OR REPLACE TEMP TABLE _buffer AS (
-    SELECT radius::UINT16 AS radius
+    SELECT radius::INT16 AS radius
     FROM UNNEST([{{ buffer | join(', ') }}]) AS t(radius)
 );
 
-CREATE OR REPLACE TEMP TABLE _rel_height AS (
-    SELECT height::UINT16 AS height
-    FROM UNNEST([{{ rel_height | join(', ') }}]) AS t(height)
+-- gap value for relative height reference
+CREATE OR REPLACE TEMP TABLE _rel_gap AS (
+    SELECT gap::INT16 AS gap
+    FROM UNNEST([{{ rel_height | join(', ') }}]) AS t(gap)
 );
-
-CREATE OR REPLACE TEMP TABLE _ab AS (
-    SELECT *
-    FROM (
-        VALUES ('above',  1), ('below', -1)
-    ) AS t(label, sign)
-);
-CREATE OR REPLACE TEMP TABLE _elev_type AS (
-    SELECT *
-    FROM VALUES ('dem', 'k'), ('dsm', 'a') AS t(elev_type, alias)
-);
-
 
 -- data filtering
 CREATE OR REPLACE TEMP TABLE _aoi_elevation AS (
-    WITH _cte1 AS (
+    WITH 
+    _aoi_h3 AS (
         SELECT 
             c.geom
-                .ST_Buffer(5000)
+                .ST_Buffer(5030)
                 .ST_Transform('EPSG:5179', 'EPSG:4326', always_xy:=true)
                 .ST_AsText()
                 .h3_polygon_wkt_to_cells_experimental(7, 'overlap')
@@ -46,106 +36,121 @@ CREATE OR REPLACE TEMP TABLE _aoi_elevation AS (
                 .UNNEST()
                 AS h3
         FROM _chunk c, _buffer b
-    ), _cte2 AS (
+    ), _elevation_h3_filtered AS (
         SELECT t.elev_type, t.value, ST_Point(t.x, t.y) AS geom
-        FROM _cte1 h
+        FROM _aoi_h3 h
         INNER JOIN elevation t ON h.h3 = t.h3
-    ), _cte3 AS (
+    ), _chunk_agg AS (
         SELECT geom.ST_Union_Agg() AS geom FROM _chunk
-    ), _cte4 AS (
-        SELECT _cte2.elev_type, _cte2.value, _cte2.geom
-        FROM _cte2
-        INNER JOIN _cte3 ON ST_DWithin(_cte2.geom, _cte3.geom, 5000)
     )
-    SELECT * FROM _cte4
+    SELECT e.elev_type, e.value, e.geom
+    FROM _elevation_h3_filtered e 
+    INNER JOIN _chunk_agg c ON ST_DWithin(e.geom, c.geom, 5030)
 );
-
 CREATE OR REPLACE TEMP TABLE _aoi_dem AS (
     SELECT value, geom 
     FROM _aoi_elevation
     WHERE elev_type = 'dem' AND value IS NOT NULL
 );
-CREATE INDEX _rtree_aoi_dem 
-ON _aoi_dem 
-USING RTREE(geom) WITH (max_node_capacity = 16);
-
 CREATE OR REPLACE TEMP TABLE _aoi_dsm AS (
     SELECT value, geom 
     FROM _aoi_elevation 
     WHERE elev_type = 'dsm' AND value IS NOT NULL
 );
-CREATE INDEX _rtree_aoi_dsm 
-ON _aoi_dsm 
-USING RTREE(geom) WITH (max_node_capacity = 16);
+
 
 
 -- main query
-WITH _altitude_k AS (
-    SELECT 
-        c.id,
-        'Altitude_k' AS gv_name,
-        value.ARGMIN(ST_Distance(c.geom, e.geom)).GREATEST(0) AS gv_value,
-    FROM _chunk c
-    LEFT JOIN _aoi_dem e ON ST_DWithin(c.geom, e.geom, 30)
-    GROUP BY c.id
-), _altitude_a AS (
-    SELECT 
-        c.id,
-        'Altitude_a' AS gv_name,
-        value.ARGMIN(ST_Distance(c.geom, e.geom)).GREATEST(0) AS gv_value,
-    FROM _chunk c
-    LEFT JOIN _aoi_dsm e ON ST_DWithin(c.geom, e.geom, 30)
-    GROUP BY c.id
-), _rel_alt_k_wide AS (
-    SELECT 
-        c.id, 
-        b.radius, 
-        h.height,
-        ((e.value > a.gv_value + h.height)::INT).MEAN() AS above, 
-        ((e.value < a.gv_value - h.height)::INT).MEAN() AS below,
-    FROM _chunk c
-    CROSS JOIN _buffer b
-    LEFT JOIN _aoi_dem e 
-        ON NOT ST_DWithin(c.geom, e.geom, b.radius)
-        AND ST_DWithin(c.geom, e.geom, b.radius + 30)
-    LEFT JOIN _altitude_k a ON c.id = a.id
-    CROSS JOIN _rel_height h
-    GROUP BY c.id, b.radius, h.height
-), _rel_alt_k AS (
-    SELECT
-        id, 
-        'Alt_k_' || ab || '_' || height::VARCHAR || '_' || radius::VARCHAR AS gv_name,
-        gv_value,
-    FROM (UNPIVOT _rel_alt_k_wide ON above, below INTO NAME ab VALUE gv_value)
-), _rel_alt_a_wide AS (
-    SELECT 
-        c.id, 
-        b.radius, 
-        h.height,
-        ((e.value > a.gv_value + h.height)::INT).MEAN() AS above, 
-        ((e.value < a.gv_value - h.height)::INT).MEAN() AS below,
-    FROM _chunk c
-    CROSS JOIN _buffer b
-    LEFT JOIN _aoi_dsm e
-        ON NOT ST_DWithin(c.geom, e.geom, b.radius)
-        AND ST_DWithin(c.geom, e.geom, b.radius + 30)
-    LEFT JOIN _altitude_a a ON c.id = a.id
-    CROSS JOIN _rel_height h
-    GROUP BY c.id, b.radius, h.height
-), _rel_alt_a AS (
-    SELECT
-        id, 
-        'Alt_a_' || ab || '_' || height::VARCHAR || '_' || radius::VARCHAR AS gv_name,
-        gv_value,
-    FROM (UNPIVOT _rel_alt_k_wide ON above, below INTO NAME ab VALUE gv_value)
-), _result AS (
-    SELECT * FROM _altitude_k
-    UNION ALL
-    SELECT * FROM _altitude_a
-    UNION ALL
-    SELECT * FROM _rel_alt_k
-    UNION ALL
-    SELECT * FROM _rel_alt_a
-)
+CREATE OR REPLACE TEMP TABLE _result AS (
+    WITH _abs_alt_dem AS (
+        SELECT
+            c.id, 
+            IFNULL(
+                e.value.ARGMIN(ST_Distance(c.geom, e.geom)),
+                0
+            ) AS value
+        FROM _chunk c
+        LEFT JOIN _aoi_dem e ON ST_DWithin(c.geom, e.geom, 30)
+        GROUP BY c.id
+    ), _abs_alt_dsm AS (
+        SELECT
+            c.id, 
+            IFNULL(
+                e.value.ARGMIN(ST_Distance(c.geom, e.geom)),
+                0
+            ) AS value
+        FROM _chunk c
+        LEFT JOIN _aoi_dem e ON ST_DWithin(c.geom, e.geom, 30)
+        GROUP BY c.id
+    ), _rel_alt_dem AS (
+        SELECT
+            c.id,
+            b.radius,
+            g.gap,
+            AVG((e.value - a.value > +g.gap)::INTEGER) AS Alt_k_above,
+            AVG((e.value - a.value < -g.gap)::INTEGER) AS Alt_k_below,
+        FROM _chunk c
+        LEFT JOIN _abs_alt_dem a ON c.id = a.id
+        CROSS JOIN _buffer b
+        CROSS JOIN _rel_gap g
+        LEFT JOIN _aoi_dem e 
+            ON NOT ST_DWithin(c.geom, e.geom, b.radius)
+            AND ST_DWithin(c.geom, e.geom, b.radius + 30)
+        GROUP BY c.id, b.radius, g.gap
+    ), _rel_alt_dsm AS (
+        SELECT
+            c.id,
+            b.radius,
+            g.gap,
+            AVG((e.value - a.value > +g.gap)::INTEGER) AS Alt_a_above,
+            AVG((e.value - a.value < -g.gap)::INTEGER) AS Alt_a_below,
+            -- AVG((e.value < a.value - g.gap)::INTEGER) AS Alt_a_below,
+            -- COUNTIF(e.value - a.value < -g.gap) / COUNT(*)  AS Alt_a_below,
+        FROM _chunk c
+        LEFT JOIN _abs_alt_dsm a ON c.id = a.id
+        CROSS JOIN _buffer b
+        CROSS JOIN _rel_gap g
+        LEFT JOIN _aoi_dsm e 
+            ON NOT ST_DWithin(c.geom, e.geom, b.radius)
+            AND ST_DWithin(c.geom, e.geom, b.radius + 30)
+        GROUP BY c.id, b.radius, g.gap
+    ), _altitude_k AS (
+        SELECT id, 'Altitude_k' AS gv_name, value AS gv_value,
+        FROM _abs_alt_dem
+    ), _altitude_a AS (
+        SELECT id, 'Altitude_a' AS gv_name, value AS gv_value,
+        FROM _abs_alt_dsm
+    ), _alt_k AS (
+        SELECT
+            id, 
+            prefix || '_' || gap::VARCHAR || '_' || radius::VARCHAR AS gv_name,
+            gv_value,
+        FROM (UNPIVOT _rel_alt_dem ON Alt_k_above, Alt_k_below INTO NAME prefix VALUE gv_value)
+    ), _alt_a AS (
+        SELECT
+            id, 
+            prefix || '_' || gap::VARCHAR || '_' || radius::VARCHAR AS gv_name,
+            gv_value,
+        FROM (UNPIVOT _rel_alt_dsm ON Alt_a_above, Alt_a_below INTO NAME prefix VALUE gv_value)
+    ), _union_result AS (
+        SELECT id, gv_name, gv_value FROM _altitude_k
+        UNION ALL
+        SELECT id, gv_name, gv_value FROM _altitude_a
+        UNION ALL
+        SELECT id, gv_name, gv_value FROM _alt_k
+        UNION ALL
+        SELECT id, gv_name, gv_value FROM _alt_a
+    )
+    SELECT r.id, y.gv_year, r.gv_name, r.gv_value
+    FROM _union_result r
+    CROSS JOIN _year y
+);
+
+-- clean temp table
+DROP TABLE IF EXISTS _aoi_dem;
+DROP TABLE IF EXISTS _aoi_dsm;
+DROP TABLE IF EXISTS _aoi_elevation;
+
 SELECT id, gv_year, gv_name, gv_value 
-FROM _result, _year;
+FROM _result
+;
