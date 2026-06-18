@@ -134,9 +134,9 @@ _chunk_oa_weight AS (
             ELSE cp_bnu_009
         END .multiply(c.weight).SUM().GREATEST(0)   AS B_bnu_7,  -- 산업분류별 사업체수: 숙박 및 음식점업
         CASE y.gv_year
-            WHEN 2000 THEN cp_bnu_010 + cp_bnu_011 + cp_bnu_013 + cp_bnu_014 + cp_bnu_015 + cp_bnu_016 + cp_bnu_017 + cp_bnu_018
-            WHEN 2005 THEN cp_bnu_010 + cp_bnu_011 + cp_bnu_013 + cp_bnu_014 + cp_bnu_015 + cp_bnu_016 + cp_bnu_017 + cp_bnu_018
-            ELSE cp_bnu_010 + cp_bnu_011 + cp_bnu_013 + cp_bnu_014 + cp_bnu_015 + cp_bnu_016 + cp_bnu_017 + cp_bnu_018 + cp_bnu_019
+            WHEN 2000 THEN cp_bnu_010 + cp_bnu_011 + cp_bnu_012 + cp_bnu_013 + cp_bnu_014 + cp_bnu_015 + cp_bnu_016 + cp_bnu_017 + cp_bnu_018
+            WHEN 2005 THEN cp_bnu_010 + cp_bnu_011 + cp_bnu_012 + cp_bnu_013 + cp_bnu_014 + cp_bnu_015 + cp_bnu_016 + cp_bnu_017 + cp_bnu_018
+            ELSE cp_bnu_010 + cp_bnu_011 + cp_bnu_012 + cp_bnu_013 + cp_bnu_014 + cp_bnu_015 + cp_bnu_016 + cp_bnu_017 + cp_bnu_018 + cp_bnu_019
         END .multiply(c.weight).SUM().GREATEST(0)   AS B_bnu_8,  -- 산업분류별 사업체수: 금융 및 기타 산업
         CASE y.gv_year
             WHEN 2000 THEN cp_bem_001 + cp_bem_002

@@ -104,8 +104,6 @@ CREATE OR REPLACE TEMP TABLE _result AS (
             g.gap,
             AVG((e.value - a.value > +g.gap)::INTEGER) AS Alt_a_above,
             AVG((e.value - a.value < -g.gap)::INTEGER) AS Alt_a_below,
-            -- AVG((e.value < a.value - g.gap)::INTEGER) AS Alt_a_below,
-            -- COUNTIF(e.value - a.value < -g.gap) / COUNT(*)  AS Alt_a_below,
         FROM _chunk c
         LEFT JOIN _abs_alt_dsm a ON c.id = a.id
         CROSS JOIN _buffer b
