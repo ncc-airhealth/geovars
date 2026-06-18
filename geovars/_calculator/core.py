@@ -36,6 +36,7 @@ class Calculator:
     workers: int = 1
     clustering: Clustering = Clustering.H3
     cluster_kwargs: dict[str, Any] = field(default_factory=dict)
+    worker_max_tasks: int | None = 50
     _con: None | DuckDBPyConnection = None
     _chunk_dfs: list[pd.DataFrame] | None = None
 
@@ -46,14 +47,15 @@ class Calculator:
         query = query_template.render(**kwargs)
         pbar = tqdm(total=self._input_count, desc=group)
         # add task
-        tasks = [
+        tasks = (
             ChunkQueryTask(query=query, chunk=chunk_df)
             for chunk_df in self.chunk_dfs
-        ]
+        )
         for cqt in calculate_chunks(
             tasks=tasks, 
             workers=self.workers,
-            connection_config=self._connection_config
+            connection_config=self._connection_config,
+            max_tasks_per_worker=self.worker_max_tasks,
         ):
             self.con.from_df(cqt.result).insert_into(RESULT_TABLE)
             pbar.update(cqt.chunk.shape[0])

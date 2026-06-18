@@ -1,10 +1,9 @@
 from __future__ import annotations
 
+import atexit
 import multiprocessing as mp
-import queue
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Iterable
+from typing import Iterable
 
 import duckdb
 import pandas as pd
@@ -13,8 +12,9 @@ from .._common import CHUNK_TABLE, ConnectionConfig
 from .database import connect_database
 
 
-SENTINEL = "__SENTINEL__"
 SUCCESS = "__SUCCESS__"
+_WORKER_CON: duckdb.DuckDBPyConnection | None = None
+
 
 @dataclass
 class ChunkQueryTask:
@@ -44,67 +44,48 @@ class ChunkQueryTask:
         return self
 
 
-def _worker(
-    connection_config: ConnectionConfig,
-    queue_start: mp.Queue[ChunkQueryTask], 
-    queue_done: mp.Queue[ChunkQueryTask]
-) -> None:
-    con = connect_database(connection_config)
-    # work
-    while True:
-        try:
-            cqt = queue_start.get(timeout=0.1)
-            if cqt.status == SENTINEL:
-                queue_done.put(cqt)
-                break
-            else:
-                cqt.con = con
-                cqt.run()
-                cqt.status = SUCCESS
-                cqt.con = None
-                queue_done.put(obj=cqt)
-        except queue.Empty:
-            continue
-    # close connection
-    con.close()
-    return
+def _close_worker_connection() -> None:
+    global _WORKER_CON
+    if _WORKER_CON is not None:
+        _WORKER_CON.close()
+        _WORKER_CON = None
+
+
+def _init_pool_worker(connection_config: ConnectionConfig) -> None:
+    global _WORKER_CON
+    # Reused within one child process until Pool maxtasksperchild recycles it.
+    _WORKER_CON = connect_database(connection_config)
+    atexit.register(_close_worker_connection)
+
+
+def _run_pool_task(cqt: ChunkQueryTask) -> ChunkQueryTask:
+    if _WORKER_CON is None:
+        raise RuntimeError("worker connection is not initialized")
+    cqt.con = _WORKER_CON
+    cqt.run()
+    cqt.status = SUCCESS
+    cqt.con = None
+    return cqt
+
 
 def calculate_chunks(
         tasks: Iterable[ChunkQueryTask],
         workers: int,
-        connection_config: ConnectionConfig
+        connection_config: ConnectionConfig,
+        max_tasks_per_worker: int | None = 50,
     ):
     """TODO: docstring 추가"""
-    # run queue
-    mp.set_start_method("spawn", force=True)
-    queue_start: mp.Queue[ChunkQueryTask] = mp.Queue()
-    queue_done: mp.Queue[ChunkQueryTask] = mp.Queue()
-    # spawn workers
-    worker_pool: list[Any] = []
-    for _ in range(workers):
-        kwargs: dict[str, Any] = {
-            "connection_config": connection_config,
-            "queue_start": queue_start, 
-            "queue_done": queue_done,
-        }
-        p = mp.Process(target=_worker, kwargs=kwargs)
-        p.start()
-        worker_pool.append(p)
-    # add tasks
-    for cqt in tasks:
-        queue_start.put(obj=cqt)
-    for _ in range(workers):
-        queue_start.put(obj=ChunkQueryTask(status=SENTINEL))
-    # get results
-    alive_workers = workers
-    while alive_workers > 0:
-        cqt = queue_done.get()
-        if cqt.status == SENTINEL:
-            alive_workers -= 1
-            continue
-        yield cqt
-    # clean
-    for p in worker_pool:
-        p.join()
-    queue_start.close()
-    queue_done.close()
+    if workers < 1:
+        raise ValueError("workers must be greater than 0")
+    if max_tasks_per_worker is not None and max_tasks_per_worker < 1:
+        raise ValueError("max_tasks_per_worker must be greater than 0")
+
+    context = mp.get_context("spawn")
+    with context.Pool(
+        processes=workers,
+        initializer=_init_pool_worker,
+        initargs=(connection_config,),
+        maxtasksperchild=max_tasks_per_worker,
+    ) as pool:
+        for cqt in pool.imap_unordered(_run_pool_task, tasks, chunksize=1):
+            yield cqt
