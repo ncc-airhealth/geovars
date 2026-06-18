@@ -9,7 +9,7 @@ description = "Python library for calculating geospatial variables with DuckDB S
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "duckdb>=1.5.3",
+    "duckdb==1.5.3",
     "jinja2",
     "pandas",
     "tqdm",
