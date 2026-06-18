@@ -16,6 +16,8 @@ SELECT
     ST_Distance(t.geom, c.geom).MIN() AS gv_value,
 FROM _chunk c
 CROSS JOIN _year y
-LEFT JOIN bus_stop t ON t.geom.ST_DWithin(c.geom, 50_000)
+CROSS JOIN bus_stop t
+--LEFT JOIN bus_stop t ON t.geom.ST_DWithin(c.geom, 50_000)
+WHERE t.year = 2023
 GROUP BY c.id, y.gv_year
 ;
