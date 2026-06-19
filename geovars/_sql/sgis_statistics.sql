@@ -168,9 +168,9 @@ _chunk_oa_weight AS (
             ELSE cp_bem_009
         END .multiply(c.weight).SUM().GREATEST(0)   AS B_bem_7,  -- 산업분류별 종사자수: 숙박 및 음식점업
         CASE y.gv_year
-            WHEN 2000 THEN cp_bem_010 + cp_bem_011 + cp_bem_013 + cp_bem_014 + cp_bem_015 + cp_bem_016 + cp_bem_017 + cp_bem_018
-            WHEN 2005 THEN cp_bem_010 + cp_bem_011 + cp_bem_013 + cp_bem_014 + cp_bem_015 + cp_bem_016 + cp_bem_017 + cp_bem_018
-            ELSE cp_bem_010 + cp_bem_011 + cp_bem_013 + cp_bem_014 + cp_bem_015 + cp_bem_016 + cp_bem_017 + cp_bem_018 + cp_bem_019
+            WHEN 2000 THEN cp_bem_010 + cp_bem_011 + cp_bem_012 + cp_bem_013 + cp_bem_014 + cp_bem_015 + cp_bem_016 + cp_bem_017 + cp_bem_018
+            WHEN 2005 THEN cp_bem_010 + cp_bem_011 + cp_bem_012 + cp_bem_013 + cp_bem_014 + cp_bem_015 + cp_bem_016 + cp_bem_017 + cp_bem_018
+            ELSE cp_bem_010 + cp_bem_011 + cp_bem_012 + cp_bem_013 + cp_bem_014 + cp_bem_015 + cp_bem_016 + cp_bem_017 + cp_bem_018 + cp_bem_019
         END .multiply(c.weight).SUM().GREATEST(0)   AS B_bem_8,  -- 산업분류별 종사자수: 금융 및 기타 산업
     FROM _chunk_oa_weight c
     CROSS JOIN _year y
