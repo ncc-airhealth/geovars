@@ -80,7 +80,7 @@ CREATE OR REPLACE TEMP TABLE _result AS (
                 0
             ) AS value
         FROM _chunk c
-        LEFT JOIN _aoi_dem e ON ST_DWithin(c.geom, e.geom, 30)
+        LEFT JOIN _aoi_dsm e ON ST_DWithin(c.geom, e.geom, 30)
         GROUP BY c.id
     ), _rel_alt_dem AS (
         SELECT
