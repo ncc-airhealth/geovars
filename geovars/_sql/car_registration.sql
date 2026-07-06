@@ -14,12 +14,11 @@ SELECT
     c.id AS id,
     y.gv_year,
     'Car_Mean' AS gv_name,
-    t.c_car_sgg_mean.ARGMIN(ST_Distance(o.geom, c.geom)) gv_value,
+    t.value.FIRST() AS gv_value,
 FROM _chunk c
-LEFT JOIN output_area o ON ST_DWithin(c.geom, o.geom, 5000)
+LEFT JOIN output_area o ON ST_Intersects(c.geom, o.geom)
 CROSS JOIN _year y 
-INNER JOIN output_area_stat t 
+INNER JOIN car_registration t 
     ON y.gv_year = t.year AND o.tot_reg_cd = t.tot_reg_cd
-
-GROUP BY id, gv_year
+GROUP BY c.id, y.gv_year
 ;
