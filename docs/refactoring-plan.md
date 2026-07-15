@@ -98,17 +98,28 @@ scripts/
   (OS, Python 버전, `uv`)만 고정
 - 시스템 의존성 관리 도구로 **[pixi](https://github.com/prefix-dev/pixi)**
   사용 — conda-forge 채널의 `gdal`, `geos`, `proj`, `uv`를 레포 루트의
-  `pixi.toml`에 선언하고 `pixi.lock`으로 고정. Dockerfile은 얇은 base 이미지
+  `pixi.toml`에 선언하고 `pixi.lock`으로 고정. 빌드 이미지는 얇은 base 이미지
   위에 pixi를 설치하고 `pixi install`(lock 파일 기준 재현 설치)만 수행
+- 별도 `Dockerfile` 파일 없이 **`docker-compose.yml`의
+  `build.dockerfile_inline`**에 Dockerfile 내용을 그대로 인라인으로 둠 —
+  레포 루트에 파일 수를 늘리지 않기 위한 선택. `.dockerignore`는 빌드
+  컨텍스트(`.`) 기준으로 그대로 적용됨
 - Python 패키지 버전은 이미지/`pixi.toml`에 고정하지 않음 (스크립트별 PEP 723
   선언에 위임) — pixi는 어디까지나 GDAL/GEOS/PROJ/uv 같은 "시스템 레벨" 도구만
   담당
 - 실제 작업은 이 Docker 컨테이너 안에서 이루어짐 (로컬에 GDAL/GEOS/PROJ를
-  직접 설치하지 않음)
+  직접 설치하지 않음). `docker compose run --rm pipeline bash`로 들어가서
+  원하는 `processing.py`를 그때그때 골라 실행하는 방식 (하나의 서비스를
+  계속 띄워두지 않고, 매번 새 컨테이너로 실행)
+- 리포 전체를 `/app`에 **bind mount**(`docker-compose.yml`의
+  `volumes: - .:/app`)하여, `geovars/`나 `scripts/`를 고쳐도 재빌드 없이
+  즉시 컨테이너에 반영됨. pixi 환경은 `/app`이 아니라 `/opt/pixi/envs/default`에
+  둬서 이 마운트가 gdal/uv를 가리지 않도록 함. 재빌드가 필요한 경우는
+  `pixi.toml`/`pixi.lock`(시스템 의존성 버전)이 바뀔 때뿐
 - R2 자격 증명은 이미지에 굽지 않고 **`.env` 파일 + `python-dotenv`**로 주입:
-  `.env`를 컨테이너에 **볼륨 마운트**하고, `processing.py`(또는 geovars
-  import 시점)가 이를 로드. `docker exec`로 들어가도 항상 같은 파일 위치에서
-  읽으므로 재현성 유지. `.env`는 `.gitignore` 처리, `.env.example`만 커밋
+  `docker-compose.yml`의 `env_file`(`required: false`)로 `.env`가 있으면
+  자동 로드, 없어도 에러 없이 넘어감. `.env`는 `.gitignore` 처리,
+  `.env.example`만 커밋
 - `python-dotenv`는 `geovars`의 **optional dependency**로 선언 (예:
   `geovars[pipeline]`) — Calculator만 쓰는 경우에는 불필요한 의존성을 늘리지
   않음
@@ -153,17 +164,33 @@ scripts/
   `python-dotenv`가 로드 (환경변수 직접 주입 대신). `python-dotenv`는
   `geovars`의 optional dependency로 선언
 - 시스템 의존성(Docker) 관리 도구: **pixi** — `pixi.toml`/`pixi.lock`으로
-  conda-forge의 `gdal`/`geos`/`proj`/`uv`를 고정. Dockerfile은 pixi 설치 +
+  conda-forge의 `gdal`/`geos`/`proj`/`uv`를 고정. 빌드는 pixi 설치 +
   `pixi install`만 수행
 - `pixi.toml` 버전 핀 (실제 `pixi add`로 conda-forge에서 resolve, `pixi.lock`
   생성 완료): `gdal>=3.13.1,<4`, `geos>=3.14.1,<4`, `proj>=9.8.1,<10`,
   `uv>=0.11.28,<0.12`. `platforms = ["linux-64", "osx-arm64"]` (Docker용
   linux-64 + 로컬 macOS 개발용 osx-arm64 모두 lock)
-- Dockerfile: 2-stage 빌드. 빌드 스테이지는 `ghcr.io/prefix-dev/pixi:0.65.0`
+- 빌드 정의: 별도 `Dockerfile` 파일 없이 `docker-compose.yml`의
+  `build.dockerfile_inline`에 2-stage 빌드를 인라인으로 작성 (레포 루트
+  파일 수를 줄이기 위한 선택). 빌드 스테이지는 `ghcr.io/prefix-dev/pixi:0.65.0`
   이미지에서 `pixi install --locked`로 `.pixi/envs/default` 생성, 런타임
-  스테이지는 `ubuntu:24.04` base에 그 결과물만 복사 (pixi 자체나 빌드 캐시는
-  최종 이미지에 남기지 않음). Python 패키지 버전은 이미지에 고정하지 않고
-  각 `processing.py`의 PEP 723 선언에 위임하는 원칙 그대로 유지
+  스테이지는 `ubuntu:24.04` base에 그 결과물만 `/opt/pixi/envs/default`로
+  복사 (pixi 자체나 빌드 캐시는 최종 이미지에 남기지 않음; `/app`이 아니라
+  `/opt` 아래 두는 이유는 아래 bind mount 항목 참고). Python 패키지 버전은
+  이미지에 고정하지 않고 각 `processing.py`의 PEP 723 선언에 위임하는 원칙
+  그대로 유지
+- `docker-compose.yml`: `pipeline` 서비스 하나, `volumes: - .:/app`으로
+  리포 전체를 bind mount, `env_file`은 `.env`를 `required: false`로 참조.
+  `docker compose run --rm pipeline bash`로 매번 새 컨테이너를 띄워
+  인터랙티브 셸에서 원하는 스크립트를 실행하는 방식 (상시 실행 서비스 아님)
+- `docker compose run --rm`은 매번 새 컨테이너를 생성·삭제하므로,
+  `uv run --script`가 받는 패키지 다운로드 캐시(`/root/.cache/uv`)가 매번
+  날아가지 않도록 `./cache/uv-cache`를 bind mount. 이미지 자체는 기존처럼
+  캐시·재사용되고, 이 마운트는 컨테이너 재생성과 무관하게 uv 다운로드
+  캐시만 영속시킴 (두 번째 실행부터 다운로드 없음을 실측 확인). named
+  volume 대신 리포 하위 `cache/`에 두는 이유는, 앞으로 DuckDB temp/spill
+  디렉토리나 S3·httpfs 캐시 등 여러 캐시를 한 곳에서 눈으로 보고 관리하기
+  위함 — `cache/`는 통째로 `.gitignore` 처리
 - `geovars` 신규 서브패키지: 기존 네이밍을 따라 `_catalog`(pystac 기반 STAC
   유틸), `_pipeline`(R2 업로드/다운로드, 좌표계 표준화 등 공유 헬퍼)
 - 기존 `_sql/*.sql` 계산 그룹과 신규 `scripts/<catalog-id>/<collection-id>`는
@@ -202,12 +229,21 @@ scripts/
   보여줌 (실제 소스/쿼리는 TODO로 표시)
 - [x] `pixi.toml`/`pixi.lock` 작성 — `pixi add gdal geos proj uv`로 실제
   conda-forge에서 resolve (버전은 위 확정된 결정 사항 참조)
-- [x] `Dockerfile`(2-stage, pixi 빌드 스테이지 + ubuntu:24.04 런타임) +
-  `.dockerignore` 작성. **단, 이 환경에는 Docker 데몬이 떠 있지 않아 실제
-  `docker build` 실행 검증은 못했음** — 다음에 Docker 사용 가능한 환경에서
-  꼭 한번 빌드 확인 필요
+- [x] Docker 빌드/실행 전체 end-to-end 검증 완료 (`docker compose build` →
+  `docker compose run --rm pipeline bash` → 컨테이너 안에서 `uv run --script
+  scripts/geovariable-data-pipeline/_template/version=0.1.0/processing.py`).
+  이 과정에서 템플릿의 `[tool.uv.sources] geovars path` hop 수가 하나 많던
+  버그(5단계 → `/`까지 올라가 빌드 실패)를 실측으로 발견해 4단계로 수정
+- [x] `Dockerfile`을 별도 파일로 두지 않고 `docker-compose.yml`의
+  `build.dockerfile_inline`으로 통합 (레포 루트 파일 수를 줄이기 위한 결정).
+  `.dockerignore`는 그대로 유지되어 빌드 컨텍스트에 적용됨
+- [x] bind mount(`volumes: - .:/app`) 시 pixi 환경이 가려지지 않는지 검증 —
+  pixi 환경을 `/opt/pixi/envs/default`로 옮겨서 `/app` 마운트와 충돌하지
+  않음을 실제 마운트 후 `gdalinfo`/`uv` 확인 + 호스트 파일 실시간 반영
+  테스트로 확인
 - [x] `.env.example`(R2_ENDPOINT_URL/R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY/
-  R2_BUCKET) 추가, `.gitignore`에 `.env` 추가
+  R2_BUCKET) 추가, `.gitignore`에 `.env` 추가. `docker-compose.yml`의
+  `env_file`은 `required: false`라 `.env`가 없어도 에러 없이 실행됨을 확인
 - [x] `pyproject.toml`: 코어 의존성에 `pystac`/`pyyaml` 추가, `python-dotenv`/
   `boto3`는 `[project.optional-dependencies] pipeline`으로 분리. `uv sync`
   및 `uv sync --extra pipeline` 모두 정상 resolve 확인
@@ -216,8 +252,6 @@ scripts/
 
 - geovars 카탈로그 유틸 API 세부 스펙 확장 (extent/temporal 기반 검색 등) —
   현재는 `collection_id`/`keyword` 검색만 구현, 필요해지면 추가
-- `.env` 볼륨 마운트 경로/이름 등 실제 `docker run`(또는 compose) 커맨드 확정,
-  및 위에서 언급한 실제 `docker build` 실행 검증
 - 기존 185GB 데이터 마이그레이션 계획 (범위 밖이지만 후속 작업으로 별도 계획
   필요)
 - `_catalog`/`_pipeline`에 대한 pytest 유닛 테스트 및 GitHub Actions workflow
@@ -225,11 +259,8 @@ scripts/
 
 ## 다음 단계
 
-1. Docker 데몬이 있는 환경에서 `docker build` 및 컨테이너 내 `uv run --script
-   scripts/geovariable-data-pipeline/_template/version=0.1.0/processing.py`
-   end-to-end 실행 검증
-2. `_catalog`/`_pipeline`에 대한 pytest 테스트 작성 + GitHub Actions workflow
+1. `_catalog`/`_pipeline`에 대한 pytest 테스트 작성 + GitHub Actions workflow
    파일 추가
-3. 템플릿을 실제 첫 collection(예: 기존 Dropbox의 collection 중 하나)에
+2. 템플릿을 실제 첫 collection(예: 기존 Dropbox의 collection 중 하나)에
    적용해보며 템플릿 구조 자체를 검증
-4. (별도 작업) 기존 데이터 마이그레이션 계획 수립
+3. (별도 작업) 기존 데이터 마이그레이션 계획 수립

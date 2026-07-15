@@ -6,3 +6,6 @@ uv.lock
 !.pixi/config.toml
 
 .env
+
+# local caches (uv, duckdb temp, S3/httpfs, ...) — see docker-compose.yml
+cache/
