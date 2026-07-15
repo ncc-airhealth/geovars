@@ -2,17 +2,19 @@
 
 # --- build stage: install the pinned pixi environment (gdal/geos/proj/uv) ---
 FROM ghcr.io/prefix-dev/pixi:0.65.0 AS build
-WORKDIR /app
+WORKDIR /src
 COPY pixi.toml pixi.lock ./
 RUN pixi install --locked --environment default
 
 # --- runtime stage: thin base image + only the resolved pixi environment ---
 FROM ubuntu:24.04 AS runtime
+
+# Kept outside /app on purpose: /app gets bind-mounted over during local dev
+# (see docs/refactoring-plan.md), and a mount would otherwise shadow this env.
+COPY --from=build /src/.pixi/envs/default /opt/pixi/envs/default
+ENV PATH="/opt/pixi/envs/default/bin:${PATH}"
+
 WORKDIR /app
-
-COPY --from=build /app/.pixi/envs/default /app/.pixi/envs/default
-ENV PATH="/app/.pixi/envs/default/bin:${PATH}"
-
 COPY . .
 
 # R2 credentials are provided at runtime via a volume-mounted `.env`
