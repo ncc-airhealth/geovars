@@ -12,7 +12,15 @@ dependencies = [
     "duckdb==1.5.4",
     "jinja2",
     "pandas",
+    "pystac",
+    "pyyaml",
     "tqdm",
+]
+
+[project.optional-dependencies]
+pipeline = [
+    "boto3",
+    "python-dotenv",
 ]
 
 [tool.uv.build-backend]
