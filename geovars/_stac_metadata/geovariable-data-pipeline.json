@@ -1,0 +1,13 @@
+{
+  "type": "Catalog",
+  "id": "geovariable-data-pipeline",
+  "stac_version": "1.1.0",
+  "description": "Geovariable data pipeline catalog.",
+  "links": [
+    {
+      "rel": "root",
+      "href": "./geovariable-data-pipeline.json",
+      "type": "application/json"
+    }
+  ]
+}
